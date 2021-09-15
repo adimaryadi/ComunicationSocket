@@ -1,8 +1,10 @@
 package main
 
 import (
+	"ComunicationSocket/Utility"
 	"encoding/json"
 	"fmt"
+	"github.com/asim/go-micro/util/log"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"net/http"
@@ -46,13 +48,15 @@ func (manager *ClientManager) start() {
 		select {
 			case conn := <-manager.register:
 				manager.clients[conn] 	= 	true
-				jsonMessage, _ := json.Marshal(&Message{Content: "/A New socket has connected."})
+				jsonMessage, _ := json.Marshal(&Message{Sender: conn.id ,Content: " Koneksi baru Telah Terhubung."})
+				log.Info("Registrasi => ",string(jsonMessage))
 				manager.send(jsonMessage,conn)
 			case conn := <-manager.unregister:
 				if _, ok := manager.clients[conn]; ok {
 					close(conn.send)
 					delete(manager.clients,conn)
-					jsonMessage, _ := json.Marshal(&Message{Content: "/A socket has Disconnected."})
+					jsonMessage, _ := json.Marshal(&Message{Sender: conn.id,Content: " koneksi Terputus."})
+					log.Info("Registrasi => ",string(jsonMessage))
 					manager.send(jsonMessage,conn)
 				}
 			case message := <-manager.broadcast:
@@ -112,15 +116,20 @@ func (c *Client) write() {
 }
 
 func wsPage(res http.ResponseWriter, req *http.Request) {
-	conn, error := (&websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}).Upgrade(res,req,nil)
+	conn, error  := (&websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}).Upgrade(res,req,nil)
+	requstQuery  := req.URL.Query()
+	everySpaceToPlus :=  Utility.SpaceFieldsJoin(requstQuery["Authorization"][0])
+	decryption       :=  Utility.Dencrytion(requstQuery["deviceID"][0],everySpaceToPlus)
+	log.Info(decryption)
+	log.Info(requstQuery)
 	if error != nil {
 		http.NotFound(res,req)
 		return
 	}
 
+
 	client := &Client{id: uuid.New().String(), socket: conn, send: make(chan []byte)}
 	manager.register <- client
-
 	go client.read()
 	go client.write()
 }
