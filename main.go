@@ -2,12 +2,14 @@ package main
 
 import (
 	"ComunicationSocket/Utility"
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/asim/go-micro/util/log"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"net/http"
+	"os"
 )
 
 type ClientManager struct {
@@ -21,6 +23,13 @@ type Client struct {
 	id 	 	string
 	socket  *websocket.Conn
 	send 	chan []byte
+}
+
+type ConfigManagement struct {
+	userName string `json: "userName,omitempty"`
+	password string `json: "password,omitempty"`
+	port     int64  `json: "port,omitempty"`
+	part     string  `json: "part,omitempty"`
 }
 
 type Message struct {
@@ -37,10 +46,54 @@ var manager   =  ClientManager{
 }
 
 func main() {
-	fmt.Println("Starting Apps....")
-	go manager.start()
-	http.HandleFunc("/ws",wsPage)
-	http.ListenAndServe(":8080",nil)
+	//fmt.Println("Starting Apps....")
+	//go manager.start()
+	//http.HandleFunc("/ws",wsPage)
+	//http.ListenAndServe(":8080",nil)
+
+	dat, err :=  os.Open("config.ind")
+	if err == nil {
+		log.Info("Running",dat)
+	}
+	if err != nil {
+		configRun()
+	}
+}
+
+func configRun() {
+	reader := readerInput(&ConfigManagement{part: "username"})
+	if len(reader) <= 4 {
+		fmt.Println("username required 4 character")
+		configRun()
+		return
+	}
+	save := &ConfigManagement{userName: reader}
+	configPassword(save)
+	return
+}
+
+func configPassword(configM *ConfigManagement) {
+	reader := readerInput(&ConfigManagement{part: "password"})
+	if len(reader) <= 3 {
+		fmt.Println("password required 4 character")
+		log.Info(len(reader))
+	    configPassword(configM)
+		return
+	}
+	save := &ConfigManagement{userName: configM.userName, password: reader}
+	configPort(save)
+	return
+}
+
+func configPort(configM *ConfigManagement) {
+//
+}
+
+func readerInput(configM *ConfigManagement) string {
+	reader   := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter "+configM.part+": ")
+	input,_ := reader.ReadString('\n')
+	return input
 }
 
 func (manager *ClientManager) start() {
